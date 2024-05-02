@@ -1,0 +1,9 @@
+name: cs5110
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - make
+  - git
+  - conda-forge::flask
+  - conda-forge::nodejs

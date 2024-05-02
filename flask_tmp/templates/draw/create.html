@@ -1,0 +1,242 @@
+{% extends 'base.html' %}
+
+
+{% block content %}
+
+<nav class="navbar navbar-expand-sm bg-light justify-content-end">
+
+    <!-- Links -->
+    <ul class="navbar-nav">
+<!--        <li class="nav-item dropdown" style="padding-right:100px;">-->
+<!--            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">Create</a>-->
+<!--            <ul class="dropdown-menu">-->
+<!--                <li><a class="dropdown-item" href="#">New Image</a></li>-->
+<!--                <li><a class="dropdown-item" href="#">Load Image</a></li>-->
+<!--            </ul>-->
+<!--        </li>-->
+        
+        
+        
+        <button onclick="editFalse()">Draw</button>
+        <button onclick="editTrue()">Edit</button>
+        
+        {% if g.user %}
+            <button onclick="postCoordinates()">Save</button>
+            <button onclick="fetchCoordinates()">Load</button>
+        {% endif %}
+    </ul>
+</nav>
+
+
+
+<canvas width="120" height="120"> Drawing canvas </canvas>
+  
+<script>
+    var canvas = document.querySelector("canvas");
+    
+    //document.body.style.margin = 0;
+    canvas.style.position = 'fixed';
+    
+    var ctx = canvas.getContext('2d');
+    resize();
+    
+    // Load and display background image
+    const img = new Image();
+    img.onload = () => {
+        requestAnimationFrame(drawAll); // Animation loop
+    }
+    //img.src = "/static/flowers.JPG";
+    //img.src = {{ url_for('static', filename='flowers.JPG') }};
+    //img.src = 'data:image/jpeg;base64,' + {{image}};
+    //img.src = "data:;base64,{{ image }}";
+    img.src = "{{ url_for('draw.loadImage', filename=image) }}"
+    console.log(img.src);
+    
+    
+    
+    //var first = { x: 0, y: 0 }; //Start of current polygon
+    var pos = { x: -1, y: -1 }; //Current coordinate
+    var coors = [];
+    var inProgress = false;
+    
+    const CONTROL_POINT_SIZE = 20;
+    var editMode = false;
+    var drag = false;
+    var activeControl = {};
+    
+    // Event listeners
+    window.addEventListener('resize', resize);
+    canvas.addEventListener('mousedown', newCoordinate);
+    canvas.addEventListener('mousemove', dragControl);
+    canvas.addEventListener('mouseup', (e) => drag=false);
+    
+    // Change the mode
+    function editFalse() {
+        editMode = false;
+    }
+    function editTrue() {
+        editMode = true;
+    }
+    
+    //Update the active control point's position to the current mouse position
+    function dragControl(e) {
+        if (drag) {
+            pos = coordinateTransform(e);
+            activeControl.x = pos.x;
+            activeControl.y = pos.y;
+        }
+    }
+    
+    // Draw line segment from coor1 to coor2
+    function draw(coor1, coor2) {
+        ctx.beginPath();
+        
+        ctx.moveTo(coor1.x, coor1.y);
+        ctx.lineTo(coor2.x, coor2.y);
+        
+        ctx.stroke();
+    }
+    
+    //Draw all control points and line segments
+    function drawAll() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // If the image is bigger than the canvas, scale the image down
+        var w = img.width;
+        var h = img.height;
+        if ( w > canvas.width ) {
+            w = canvas.width;
+            h = img.height * (canvas.width/img.width);
+        } if ( h > canvas.height ) {
+            h = canvas.height;
+            w = img.width * (canvas.height/img.height);
+        }
+        img.width = w;
+        img.height = h;
+        ctx.drawImage(img, (canvas.width-img.width)/2, 0, img.width, img.height);
+        
+        // Formatting
+        ctx.lineWidth = 5;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = '#c0392b';
+        
+        for (var i = 0; i < coors.length; i++) {//For all polygons
+            for (var j = 0; j < coors[i].length-1; j++) {//For all vertices
+                //Draw line, then control point
+                draw(coors[i][j], coors[i][j+1]);
+                ctx.strokeRect(coors[i][j+1].x-10, coors[i][j+1].y-10, CONTROL_POINT_SIZE, CONTROL_POINT_SIZE);
+                ctx.fill()
+            }
+            //If we are not on the current polygon or no polygon is currently being drawn, then draw the final line segment
+            if (i < coors.length-1 || !inProgress) {
+                draw(coors[i][0], coors[i][coors[i].length-1]);
+            }
+            // Draw final control point
+            ctx.strokeRect(coors[i][0].x-10, coors[i][0].y-10, CONTROL_POINT_SIZE, CONTROL_POINT_SIZE);
+            ctx.fill()
+        }
+        // Next frame in animation loop
+        requestAnimationFrame(drawAll);
+    }
+    
+    // Send coordinates as a JSON
+    function postCoordinates() {
+        const url = {{ url_for("draw.create", id=img_id)|tojson }};
+        fetch(url, {
+            "method": "POST",
+            "headers": {"Content-Type": "application/json"},
+            "body": JSON.stringify(coors),
+        });
+    }
+    
+    // Load saved coordinates as a JSON
+    function fetchCoordinates() {
+        const url = {{ url_for("draw.loadData", id=img_id)|tojson }};
+        fetch(url).then( response => response.json() ).then( json => {coors = JSON.parse(json)} );
+    }
+    
+    //Add a new coordinate to the list of coors
+    function pushCoor(pos) {
+        // Uses Object.assign for deep copy
+        coors[coors.length - 1].push( Object.assign({}, pos) );
+    }
+    
+    // Transform the given coordinates from screen space into canvas space
+    function coordinateTransform(e) {
+        var c = {x: e.clientX, y: e.clientY};
+        
+        // Offset by canvas upper-left coordinate
+        var rect = canvas.getBoundingClientRect();
+        c.x = c.x - rect.left;
+        c.y = c.y - rect.top;
+        
+        return c;
+    }
+    
+    // Get distance between two points
+    function dist(coor1, coor2) {
+        return (coor1.x - coor2.x)*(coor1.x - coor2.x) + (coor1.y - coor2.y)*(coor1.y - coor2.y)
+    }
+    
+    //Get the control point closest to the current mouse position
+    function nearestControl(pos) {
+        for (var i = 0; i < coors.length; i++) {
+            for (var j = 0; j < coors[i].length; j++) {
+                if ( dist( pos,coors[i][j] ) < CONTROL_POINT_SIZE*CONTROL_POINT_SIZE ) {
+                    return {c:coors[i][j], flag:true};
+                }
+            }
+        }
+        return {c:[], flag:false};
+    }
+    
+    // new position from mouse event
+    function newCoordinate(e) {
+        pos = coordinateTransform(e);
+        
+        if (!editMode) {
+            if (inProgress) {// If in-progress polygon
+                // If we click on the start of the polygon, complete the polygon
+                if ( dist(pos, coors[coors.length-1][0]) < CONTROL_POINT_SIZE*CONTROL_POINT_SIZE ) {
+                    inProgress = false;
+                    return;
+                }
+            } else {// Else, start new polygon
+                coors.push( [] );
+                inProgress = true;
+            }
+            // Record new coordinate
+            pushCoor(pos);
+            
+            return;
+        } else { //Else, new mode
+            //If we click on a control point, initiate dragging
+            const {c,flag} = nearestControl(pos);
+            if (flag) {
+                drag = true;
+                activeControl = c;
+            }
+            
+        }
+        
+    }
+    
+    // resize canvas
+    function resize() {
+        var rect = canvas.getBoundingClientRect();
+        
+        ctx.canvas.width = window.innerWidth;
+        ctx.canvas.height = window.innerHeight - rect.top;
+    }
+    
+    
+    // Debugging display
+    //coors[0].forEach((item, index) => {
+    //    console.log(`${index}: ${item.x} ${item.y}`);
+    //});
+    
+</script>
+
+{% endblock %}
+
+

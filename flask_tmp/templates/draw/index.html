@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+
+
+{% block content %}
+    <nav class="navbar navbar-expand-sm bg-light justify-content-end">
+        <ul class="navbar-nav">
+            
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#myModal">
+                New Image
+            </button>
+
+            <!-- The Modal -->
+            <div class="modal" id="myModal">
+              <div class="modal-dialog">
+                <div class="modal-content">
+
+                  <!-- Modal Header -->
+                  <div class="modal-header">
+                    <h4 class="modal-title">New Image</h4>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                  </div>
+
+                  <!-- Modal body -->
+                  <div class="modal-body">
+                      <form method="post" enctype=multipart/form-data>
+
+                          <label for="image">Choose a profile picture:</label>
+                          <input type="file" id="image" name="image" accept="image/png, image/jpeg" value="{{ request.form['image'] }}"/>
+                          <div class="view"> </div>
+                          <input type="submit" value="Save">
+                      </form>
+                  </div>
+
+                  <!-- Modal footer -->
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Close</button>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+            
+        </ul>
+    </nav>
+
+
+
+    
+    {% set num_cols = images|length // 3 %}
+    {% set num_final_row = images|length % 3 %}
+    
+    {% for n in range(0,num_cols,3) %}
+        <div class="row">
+            <div class="col">
+                <a href= {{ url_for("draw.create", id=images[n]['id'])|tojson }} >
+                <img src={{ url_for('draw.loadImage', filename=images[n]['image']) }} class="img-fluid" id="myImage1">
+                </a>
+            </div>
+            <div class="col">
+                <a href= {{ url_for("draw.create", id=images[n+1]['id'])|tojson }} >
+                <img src={{ url_for('draw.loadImage', filename=images[n+1]['image']) }} class="img-fluid" id="myImage">
+                </a>
+            </div>
+            <div class="col">
+                <a href= {{ url_for("draw.create", id=images[n+2]['id'])|tojson }} >
+                <img src={{ url_for('draw.loadImage', filename=images[n+2]['image']) }} class="img-fluid" id="myImage">
+                </a>
+            </div>
+        </div>
+        
+    {% endfor %}
+    
+    <div class="row">
+    {% for n in range(num_cols*3, num_cols*3+num_final_row) %}
+        <div class="col">
+            <a href= {{ url_for("draw.create", id=images[n]['id'])|tojson }} >
+            <img src={{ url_for('draw.loadImage', filename=images[n]['image']) }} class="img-fluid" id="myImage1">
+            </a>
+        </div>
+    {% endfor %}
+    {% for n in range(num_final_row,3) %}
+        <div class="col">
+        </div>
+    {% endfor %}
+    </div>
+
+
+
+
+
+{% endblock %}
+
